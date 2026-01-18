@@ -1,14 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AttendanceStats } from '@/models/Attendance';
+import { AttendanceStats, LeaveStats } from '@/models/Attendance';
 import StatsCard from '@/components/StatsCard';
 import MarkAttendance from '@/components/MarkAttendance';
 import Navigation from '@/components/Navigation';
-import RequestLeave from '@/components/RequestLeave';
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<AttendanceStats | null>(null);
+  const [leaveStats, setLeaveStats] = useState<LeaveStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
@@ -18,12 +18,20 @@ export default function DashboardPage() {
       const year = currentMonth.getFullYear();
       const month = currentMonth.getMonth() + 1;
 
-      const response = await fetch(
-        `/api/attendance/stats?year=${year}&month=${month}`
-      );
-      if (response.ok) {
-        const data = await response.json();
+      // Fetch both attendance stats and leave stats
+      const [attendanceResponse, leaveResponse] = await Promise.all([
+        fetch(`/api/attendance/stats?year=${year}&month=${month}`),
+        fetch(`/api/attendance/leaves?year=${year}`),
+      ]);
+
+      if (attendanceResponse.ok) {
+        const data = await attendanceResponse.json();
         setStats(data);
+      }
+
+      if (leaveResponse.ok) {
+        const data = await leaveResponse.json();
+        setLeaveStats(data);
       }
     } catch (error) {
       console.error('Failed to fetch stats:', error);
@@ -74,64 +82,34 @@ export default function DashboardPage() {
           {/* Stats Grid */}
           <div className='mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4'>
             <StatsCard
-              title='Total Working Days'
-              value={stats?.totalWorkingDays.toFixed(1) || '0'}
-              subtitle='This month'
-              icon='📊'
-              color='blue'
-            />
-            <StatsCard
               title='Work From Office'
               value={stats?.workFromOffice || 0}
-              subtitle='Office days'
+              subtitle='This month'
               icon='🏢'
               color='green'
             />
             <StatsCard
               title='Work From Home'
               value={stats?.workFromHome || 0}
-              subtitle='Remote days'
+              subtitle='This month'
               icon='🏠'
-              color='purple'
+              color='blue'
             />
             <StatsCard
-              title='Attendance Rate'
+              title='Leaves Taken'
+              value={leaveStats?.usedLeaves || 0}
+              subtitle='This year'
+              icon='🏖️'
+              color='orange'
+            />
+            <StatsCard
+              title='Monthly Attendance'
               value={`${stats?.attendanceRate || 0}%`}
               subtitle='Excluding weekends'
-              icon='📈'
-              color='indigo'
+              icon='📊'
+              color='purple'
             />
           </div>
-
-          <div className='mt-6 grid gap-6 sm:grid-cols-2'>
-            <StatsCard
-              title='Absent Days'
-              value={stats?.absentDays || 0}
-              subtitle='This month'
-              icon='📉'
-              color='red'
-            />
-            <StatsCard
-              title='Month Progress'
-              value={`${Math.round(
-                (new Date().getDate() /
-                  new Date(year, currentMonth.getMonth() + 1, 0).getDate()) *
-                  100
-              )}%`}
-              subtitle={`Day ${new Date().getDate()} of ${new Date(
-                year,
-                currentMonth.getMonth() + 1,
-                0
-              ).getDate()}`}
-              icon='📅'
-              color='teal'
-            />
-          </div>
-        </div>
-
-        {/* Floating Add Leave Widget */}
-        <div className='fixed bottom-6 right-6 z-50'>
-          <RequestLeave onLeaveRequested={fetchStats} />
         </div>
       </div>
     </>

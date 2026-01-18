@@ -36,6 +36,7 @@ export interface LeaveStats {
   plannedLeaves: number;
   unplannedLeaves: number;
   parentalLeaves: number;
+  unpaidLeaves: number;
   plannedLeaveQuota: number;
   unplannedLeaveQuota: number;
   parentalLeaveQuota: number;

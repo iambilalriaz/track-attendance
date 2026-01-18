@@ -83,15 +83,20 @@ export async function getLeaveStats(
     })
     .toArray();
 
-  // Count leaves by checking notes for leave type labels
+  // Count unpaid leaves separately (these don't count towards quota)
+  const unpaidLeaves = records.filter(
+    (r) => r.notes?.includes("Unpaid Leave")
+  ).length;
+
+  // Count paid leaves by checking notes for leave type labels (excluding unpaid)
   const plannedLeaves = records.filter(
-    (r) => r.notes?.includes("Planned Leave")
+    (r) => r.notes?.includes("Planned Leave") && !r.notes?.includes("Unpaid Leave")
   ).length;
   const unplannedLeaves = records.filter(
-    (r) => r.notes?.includes("Unplanned Leave")
+    (r) => r.notes?.includes("Unplanned Leave") && !r.notes?.includes("Unpaid Leave")
   ).length;
   const parentalLeaves = records.filter(
-    (r) => r.notes?.includes("Parental Leave")
+    (r) => r.notes?.includes("Parental Leave") && !r.notes?.includes("Unpaid Leave")
   ).length;
 
   const usedLeaves = plannedLeaves + unplannedLeaves + parentalLeaves;
@@ -106,6 +111,7 @@ export async function getLeaveStats(
     plannedLeaves,
     unplannedLeaves,
     parentalLeaves,
+    unpaidLeaves,
     plannedLeaveQuota,
     unplannedLeaveQuota,
     parentalLeaveQuota,
@@ -202,4 +208,72 @@ function getWeekdaysInMonth(year: number, month: number): number {
   }
 
   return weekdayCount;
+}
+
+// Helper to convert day number to day name
+function getDayName(dayNumber: number): string {
+  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  return days[dayNumber];
+}
+
+// Check for existing attendance records in a date range (excluding weekends)
+export async function getExistingAttendanceInRange(
+  userId: string,
+  startDate: Date,
+  endDate: Date
+): Promise<{ date: Date; status: string }[]> {
+  const collection = await getAttendanceCollection();
+
+  const start = new Date(startDate);
+  start.setHours(0, 0, 0, 0);
+
+  const end = new Date(endDate);
+  end.setHours(23, 59, 59, 999);
+
+  const records = await collection
+    .find({
+      userId,
+      date: { $gte: start, $lte: end },
+    })
+    .toArray();
+
+  return records.map((r) => ({
+    date: r.date,
+    status: r.status,
+  }));
+}
+
+// Auto-mark attendance for today based on user settings
+export async function autoMarkTodayAttendance(
+  userId: string,
+  userEmail: string
+): Promise<Attendance | null> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const dayOfWeek = today.getDay();
+
+  // Skip weekends
+  if (dayOfWeek === 0 || dayOfWeek === 6) {
+    return null;
+  }
+
+  // Check if already marked
+  const existing = await getTodayAttendance(userId);
+  if (existing) {
+    return existing;
+  }
+
+  // Get user settings
+  const userSettings = await getUserSettings(userId);
+  const defaultWfhDays = userSettings?.defaultWorkFromHomeDays || [];
+
+  // Determine status based on default WFH days
+  const todayName = getDayName(dayOfWeek);
+  const isWfhDay = defaultWfhDays.includes(todayName);
+
+  const status = isWfhDay ? "wfh" : "present";
+
+  // Auto-mark attendance
+  return await markAttendance(userId, userEmail, today, status, "Auto-marked");
 }

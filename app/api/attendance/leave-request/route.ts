@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { markAttendance } from "@/lib/db/attendance";
+import { markAttendance, getExistingAttendanceInRange, getLeaveStats } from "@/lib/db/attendance";
+import { getUserSettings } from "@/lib/db/user-settings";
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,36 +38,126 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Calculate days and mark attendance for each day as absent
-    const markedDates = [];
-    const currentDate = new Date(start);
+    // Check for existing attendance records in the date range
+    const existingRecords = await getExistingAttendanceInRange(
+      session.user.id,
+      start,
+      end
+    );
 
-    while (currentDate <= end) {
-      // Mark as absent with leave type in notes
-      const leaveTypeLabel = leaveType === "planned-leave" ? "Planned Leave"
-        : leaveType === "unplanned-leave" ? "Unplanned Leave"
-        : "Parental Leave";
+    // Filter to only weekday records that are already leaves (absent status)
+    const existingLeaves = existingRecords.filter((r) => {
+      const dayOfWeek = new Date(r.date).getDay();
+      return dayOfWeek !== 0 && dayOfWeek !== 6 && r.status === "absent";
+    });
 
-      const noteText = notes
-        ? `${leaveTypeLabel} - ${notes}`
-        : leaveTypeLabel;
-
-      await markAttendance(
-        session.user.id,
-        session.user.email,
-        new Date(currentDate),
-        "absent",
-        noteText
+    if (existingLeaves.length > 0) {
+      const conflictDates = existingLeaves.map((r) =>
+        new Date(r.date).toLocaleDateString("en-US", {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+        })
       );
 
-      markedDates.push(new Date(currentDate));
+      return NextResponse.json(
+        {
+          error: "Leave already exists for some dates",
+          conflictDates,
+          message: `You already have leave marked for: ${conflictDates.join(", ")}`,
+        },
+        { status: 409 }
+      );
+    }
+
+    // Count requested weekdays
+    let requestedDays = 0;
+    const tempDate = new Date(start);
+    while (tempDate <= end) {
+      const dayOfWeek = tempDate.getDay();
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        requestedDays++;
+      }
+      tempDate.setDate(tempDate.getDate() + 1);
+    }
+
+    // Get current leave stats to check quota
+    const year = start.getFullYear();
+    const leaveStats = await getLeaveStats(session.user.id, year);
+    const userSettings = await getUserSettings(session.user.id);
+
+    // Calculate available quota for the selected leave type
+    let usedOfType = 0;
+    let quotaOfType = 0;
+    let leaveTypeLabel = "";
+
+    if (leaveType === "planned-leave") {
+      usedOfType = leaveStats.plannedLeaves;
+      quotaOfType = userSettings?.leaveQuota?.planned || 15;
+      leaveTypeLabel = "Planned Leave";
+    } else if (leaveType === "unplanned-leave") {
+      usedOfType = leaveStats.unplannedLeaves;
+      quotaOfType = userSettings?.leaveQuota?.unplanned || 10;
+      leaveTypeLabel = "Unplanned Leave";
+    } else {
+      usedOfType = leaveStats.parentalLeaves;
+      quotaOfType = userSettings?.leaveQuota?.parentalLeave || 0;
+      leaveTypeLabel = "Parental Leave";
+    }
+
+    const availableQuota = Math.max(0, quotaOfType - usedOfType);
+    const paidDays = Math.min(requestedDays, availableQuota);
+    const unpaidDays = requestedDays - paidDays;
+
+    // Calculate days and mark attendance for each day as absent (excluding weekends)
+    const markedDates = [];
+    const unpaidDates = [];
+    const currentDate = new Date(start);
+    let paidCount = 0;
+
+    while (currentDate <= end) {
+      const dayOfWeek = currentDate.getDay();
+
+      // Skip weekends (Saturday = 6, Sunday = 0)
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        const isUnpaid = paidCount >= paidDays;
+        const actualLeaveType = isUnpaid ? "Unpaid Leave" : leaveTypeLabel;
+
+        const noteText = notes
+          ? `${actualLeaveType} - ${notes}`
+          : actualLeaveType;
+
+        await markAttendance(
+          session.user.id,
+          session.user.email,
+          new Date(currentDate),
+          "absent",
+          noteText
+        );
+
+        if (isUnpaid) {
+          unpaidDates.push(new Date(currentDate));
+        } else {
+          markedDates.push(new Date(currentDate));
+          paidCount++;
+        }
+      }
+
       currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    // Build response message
+    let message = `Leave marked for ${markedDates.length + unpaidDates.length} day(s)`;
+    if (unpaidDates.length > 0) {
+      message += ` (${unpaidDates.length} unpaid)`;
     }
 
     return NextResponse.json({
       success: true,
-      daysCount: markedDates.length,
-      message: `Leave marked for ${markedDates.length} day(s)`
+      daysCount: markedDates.length + unpaidDates.length,
+      paidDays: markedDates.length,
+      unpaidDays: unpaidDates.length,
+      message
     });
   } catch (error) {
     console.error("Error processing leave request:", error);

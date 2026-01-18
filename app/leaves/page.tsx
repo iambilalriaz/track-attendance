@@ -4,11 +4,12 @@ import { useEffect, useState } from 'react';
 import { LeaveStats } from '@/models/Attendance';
 import LeaveCard from '@/components/LeaveCard';
 import Navigation from '@/components/Navigation';
-import RequestLeave from '@/components/RequestLeave';
+import LeaveBottomSheet from '@/components/LeaveBottomSheet';
 
 export default function LeavesPage() {
   const [stats, setStats] = useState<LeaveStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isLeaveSheetOpen, setIsLeaveSheetOpen] = useState(false);
 
   const fetchLeaveStats = async () => {
     try {
@@ -60,7 +61,27 @@ export default function LeavesPage() {
 
           {/* Request Leave Button */}
           <div className='mb-8'>
-            <RequestLeave onLeaveRequested={fetchLeaveStats} />
+            <button
+              onClick={() => setIsLeaveSheetOpen(true)}
+              className='flex items-center gap-3 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 px-6 py-3 font-semibold text-white shadow-lg transition-all hover:from-amber-700 hover:to-amber-800 hover:shadow-xl'
+            >
+              <div className='rounded-full bg-white/20 p-2 backdrop-blur-sm'>
+                <svg
+                  className='h-5 w-5'
+                  fill='none'
+                  stroke='currentColor'
+                  viewBox='0 0 24 24'
+                >
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth={2}
+                    d='M12 4v16m8-8H4'
+                  />
+                </svg>
+              </div>
+              Add Leave
+            </button>
           </div>
 
           {/* Total Leaves Overview */}
@@ -120,6 +141,33 @@ export default function LeavesPage() {
             />
           </div>
 
+          {/* Unpaid Leaves Section */}
+          {(stats?.unpaidLeaves || 0) > 0 && (
+            <div className='mt-6 rounded-2xl bg-gradient-to-br from-red-500/10 to-red-600/10 backdrop-blur-xl border border-red-500/20 p-6'>
+              <div className='flex items-center gap-4'>
+                <div className='flex h-14 w-14 items-center justify-center rounded-xl bg-red-500/20 text-2xl'>
+                  💸
+                </div>
+                <div className='flex-1'>
+                  <h3 className='text-lg font-semibold text-zinc-900 dark:text-white'>
+                    Unpaid Leaves
+                  </h3>
+                  <p className='text-sm text-zinc-600 dark:text-zinc-400'>
+                    Leaves beyond your quota (not paid)
+                  </p>
+                </div>
+                <div className='text-right'>
+                  <div className='text-3xl font-bold text-red-600 dark:text-red-400'>
+                    {stats?.unpaidLeaves || 0}
+                  </div>
+                  <p className='text-xs text-zinc-500 dark:text-zinc-500'>
+                    days
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Info Section */}
           <div className='mt-8 rounded-2xl border-2 border-dashed border-zinc-300 bg-zinc-50 p-6 dark:border-zinc-700 dark:bg-zinc-900'>
             <h3 className='mb-4 text-lg font-semibold text-zinc-900 dark:text-white'>
@@ -145,6 +193,12 @@ export default function LeavesPage() {
           </div>
         </div>
       </div>
+
+      <LeaveBottomSheet
+        isOpen={isLeaveSheetOpen}
+        onClose={() => setIsLeaveSheetOpen(false)}
+        onLeaveRequested={fetchLeaveStats}
+      />
     </>
   );
 }
