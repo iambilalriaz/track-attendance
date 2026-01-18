@@ -11,6 +11,7 @@ export default function Navigation() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [profilePopupOpen, setProfilePopupOpen] = useState(false);
 
   // Lock body scroll when sidebar is open
   useEffect(() => {
@@ -41,7 +42,9 @@ export default function Navigation() {
           {/* Logo and Nav Items */}
           <div className="flex items-center gap-8">
             <Link href="/dashboard" className="flex items-center gap-2">
-              <span className="text-2xl">📅</span>
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-sm font-bold shadow-md">
+                TA
+              </div>
               <span className="text-xl font-bold text-zinc-900 dark:text-white">
                 Track Attendance
               </span>
@@ -72,8 +75,11 @@ export default function Navigation() {
           <div className="flex items-center gap-4">
             {session?.user && (
               <>
-                {/* Desktop User Info */}
-                <div className="hidden items-center gap-3 md:flex">
+                {/* Desktop User Info - Clickable */}
+                <button
+                  onClick={() => setProfilePopupOpen(true)}
+                  className="hidden items-center gap-3 md:flex rounded-lg px-2 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                >
                   {session.user.image && (
                     <Image
                       src={session.user.image}
@@ -83,15 +89,10 @@ export default function Navigation() {
                       className="rounded-full ring-2 ring-zinc-200 dark:ring-zinc-700"
                     />
                   )}
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-zinc-900 dark:text-white">
-                      {session.user.name}
-                    </p>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                      {session.user.email}
-                    </p>
-                  </div>
-                </div>
+                  <p className="text-sm font-medium text-zinc-900 dark:text-white">
+                    {session.user.name}
+                  </p>
+                </button>
 
                 {/* Desktop Sign Out */}
                 <button
@@ -156,7 +157,9 @@ export default function Navigation() {
         {/* Sidebar Header */}
         <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 p-4">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">📅</span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-sm font-bold shadow-md">
+              TA
+            </div>
             <span className="text-lg font-bold text-zinc-900 dark:text-white">
               Track Attendance
             </span>
@@ -182,8 +185,14 @@ export default function Navigation() {
           </button>
         </div>
 
-        {/* User Info */}
-        <div className="border-b border-zinc-200 dark:border-zinc-800 p-4">
+        {/* User Info - Clickable */}
+        <button
+          onClick={() => {
+            setMobileMenuOpen(false);
+            setProfilePopupOpen(true);
+          }}
+          className="w-full border-b border-zinc-200 dark:border-zinc-800 p-4 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-left"
+        >
           <div className="flex items-center gap-3">
             {session?.user?.image && (
               <Image
@@ -198,12 +207,12 @@ export default function Navigation() {
               <p className="truncate text-sm font-semibold text-zinc-900 dark:text-white">
                 {session?.user?.name}
               </p>
-              <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
-                {session?.user?.email}
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Tap to view profile
               </p>
             </div>
           </div>
-        </div>
+        </button>
 
         {/* Navigation Links */}
         <div className="flex-1 overflow-y-auto p-4">
@@ -240,6 +249,74 @@ export default function Navigation() {
         </div>
       </div>
     </div>
+
+    {/* Profile Popup */}
+    {profilePopupOpen && (
+      <>
+        {/* Backdrop */}
+        <div
+          className="fixed inset-0 z-[200] bg-black/50 backdrop-blur-sm"
+          onClick={() => setProfilePopupOpen(false)}
+        />
+        {/* Popup */}
+        <div className="fixed inset-0 z-[201] flex items-center justify-center p-4">
+          <div className="relative w-full max-w-sm rounded-2xl bg-white/90 dark:bg-zinc-800/90 backdrop-blur-xl border border-zinc-200/50 dark:border-zinc-700/50 p-6 shadow-2xl">
+            {/* Close Button */}
+            <button
+              onClick={() => setProfilePopupOpen(false)}
+              className="absolute top-3 right-3 rounded-lg p-2 text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-700 transition-colors"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            {/* Profile Content */}
+            <div className="flex flex-col items-center text-center">
+              {session?.user?.image && (
+                <Image
+                  src={session.user.image}
+                  alt={session.user.name || "User"}
+                  width={80}
+                  height={80}
+                  className="rounded-full ring-4 ring-indigo-500/20 mb-4"
+                />
+              )}
+              <h3 className="text-xl font-bold text-zinc-900 dark:text-white">
+                {session?.user?.name}
+              </h3>
+              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                {session?.user?.email}
+              </p>
+
+              {/* Actions */}
+              <div className="mt-6 w-full space-y-3">
+                <Link
+                  href="/settings"
+                  onClick={() => setProfilePopupOpen(false)}
+                  className="flex items-center justify-center gap-2 w-full rounded-xl bg-zinc-100 dark:bg-zinc-700 px-4 py-3 text-sm font-medium text-zinc-900 dark:text-white hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-colors"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Settings
+                </Link>
+                <button
+                  onClick={() => signOut({ callbackUrl: "/login" })}
+                  className="flex items-center justify-center gap-2 w-full rounded-xl bg-red-500 px-4 py-3 text-sm font-medium text-white hover:bg-red-600 transition-colors"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    )}
     </>
   );
 }

@@ -44,8 +44,11 @@ export default function SettingsPage() {
         if (data.leaveQuota) {
           setLeaveQuota(data.leaveQuota);
         }
-        if (data.defaultWorkFromHomeDays && Array.isArray(data.defaultWorkFromHomeDays)) {
+        if (data.defaultWorkFromHomeDays && Array.isArray(data.defaultWorkFromHomeDays) && data.defaultWorkFromHomeDays.length > 0) {
           setDefaultWorkFromHomeDays(data.defaultWorkFromHomeDays);
+        } else {
+          // Preselect Thursday & Friday as default WFH days
+          setDefaultWorkFromHomeDays(["Thursday", "Friday"]);
         }
       }
     } catch (error) {
