@@ -13,10 +13,22 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Allow static files and images
+  if (
+    pathname.includes(".") ||
+    pathname.startsWith("/_next")
+  ) {
+    return NextResponse.next();
+  }
+
   // Check for JWT token (works in Edge runtime)
+  // Auth.js v5 uses 'authjs' cookie prefix by default
   const token = await getToken({
     req: request,
     secret: process.env.AUTH_SECRET,
+    cookieName: process.env.NODE_ENV === "production"
+      ? "__Secure-authjs.session-token"
+      : "authjs.session-token",
   });
 
   // If no token, user is not authenticated
