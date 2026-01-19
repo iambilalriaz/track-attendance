@@ -56,15 +56,29 @@ export default function MonthlyWorkModeReportPage() {
     fetchReport();
   }, []);
 
-  const handleExportPDF = () => {
-    if (!report || !session?.user) return;
+  const handleExportPDF = async () => {
+    if (!session?.user) return;
 
-    const html = generateMonthlyReportHTML(
-      report,
-      session.user.name || 'User',
-      session.user.email || ''
-    );
-    exportToPDF(html, `work-mode-report-${report.monthName}-${report.year}.pdf`);
+    try {
+      setLoading(true);
+      // Always fetch fresh data with current filter selections
+      const response = await fetch(
+        `/api/attendance/monthly-report?year=${selectedYear}&month=${selectedMonth}`
+      );
+      if (response.ok) {
+        const data: MonthlyReportData = await response.json();
+        const html = generateMonthlyReportHTML(
+          data,
+          session.user.name || 'User',
+          session.user.email || ''
+        );
+        exportToPDF(html, `work-mode-report-${data.monthName}-${data.year}.pdf`);
+      }
+    } catch (error) {
+      console.error('Error exporting report:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getStatusStyle = (status: string) => {

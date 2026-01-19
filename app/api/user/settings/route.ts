@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getAuthenticatedUser } from "@/lib/auth-api";
 import {
   updateUserSettings,
   getUserSettings,
@@ -7,12 +7,12 @@ import {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const user = await getAuthenticatedUser();
+    if (!user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const settings = await getUserSettings(session.user.id);
+    const settings = await getUserSettings(user.id);
     return NextResponse.json(settings);
   } catch (error) {
     console.error("Error fetching user settings:", error);
@@ -25,8 +25,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const user = await getAuthenticatedUser();
+    if (!user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const result = await updateUserSettings(session.user.id, {
+    const result = await updateUserSettings(user.id, {
       leaveQuota,
       defaultWorkFromHomeDays,
     });

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getAuthenticatedUser } from "@/lib/auth-api";
 import { markAttendance, getExistingAttendanceInRange, getLeaveStats } from "@/lib/db/attendance";
 import { getUserSettings } from "@/lib/db/user-settings";
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id || !session?.user?.email) {
+    const user = await getAuthenticatedUser();
+    if (!user?.id || !user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
 
     // Check for existing attendance records in the date range
     const existingRecords = await getExistingAttendanceInRange(
-      session.user.id,
+      user.id,
       start,
       end
     );
@@ -83,8 +83,8 @@ export async function POST(request: NextRequest) {
 
     // Get current leave stats to check quota
     const year = start.getFullYear();
-    const leaveStats = await getLeaveStats(session.user.id, year);
-    const userSettings = await getUserSettings(session.user.id);
+    const leaveStats = await getLeaveStats(user.id, year);
+    const userSettings = await getUserSettings(user.id);
 
     // Calculate available quota for the selected leave type
     let usedOfType = 0;
@@ -128,8 +128,8 @@ export async function POST(request: NextRequest) {
           : actualLeaveType;
 
         await markAttendance(
-          session.user.id,
-          session.user.email,
+          user.id,
+          user.email,
           new Date(currentDate),
           "absent",
           noteText

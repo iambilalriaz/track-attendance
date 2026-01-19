@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getAuthenticatedUser } from "@/lib/auth-api";
 import { getAttendanceCollection } from "@/lib/db/attendance";
 
 export interface MonthlyReportRecord {
@@ -11,9 +11,9 @@ export interface MonthlyReportRecord {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
+    const user = await getAuthenticatedUser();
 
-    if (!session?.user?.id) {
+    if (!user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     // Get all attendance records for the month
     const records = await collection
       .find({
-        userId: session.user.id,
+        userId: user.id,
         date: { $gte: firstDay, $lte: lastDay },
       })
       .sort({ date: 1 })

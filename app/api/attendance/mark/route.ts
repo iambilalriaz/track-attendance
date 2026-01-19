@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getAuthenticatedUser } from "@/lib/auth-api";
 import { markAttendance } from "@/lib/db/attendance";
 import { AttendanceStatus } from "@/models/Attendance";
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
+    const user = await getAuthenticatedUser();
 
-    if (!session?.user?.id || !session?.user?.email) {
+    if (!user?.id || !user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -39,8 +39,8 @@ export async function POST(request: NextRequest) {
     }
 
     const attendance = await markAttendance(
-      session.user.id,
-      session.user.email,
+      user.id,
+      user.email,
       new Date(date),
       status,
       notes

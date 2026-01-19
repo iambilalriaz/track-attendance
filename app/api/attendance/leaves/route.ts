@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getAuthenticatedUser } from "@/lib/auth-api";
 import { getLeaveStats } from "@/lib/db/attendance";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
+    const user = await getAuthenticatedUser();
 
-    if (!session?.user?.id) {
+    if (!user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
       searchParams.get("year") || new Date().getFullYear().toString()
     );
 
-    const stats = await getLeaveStats(session.user.id, year);
+    const stats = await getLeaveStats(user.id, year);
 
     return NextResponse.json(stats);
   } catch (error) {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getAuthenticatedUser } from "@/lib/auth-api";
 import { getAttendanceCollection } from "@/lib/db/attendance";
 import { getUserSettings } from "@/lib/db/user-settings";
 
@@ -12,9 +12,9 @@ export interface YearlyLeaveRecord {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
+    const user = await getAuthenticatedUser();
 
-    if (!session?.user?.id) {
+    if (!user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     // Get all leave records for the year (status = absent)
     const records = await collection
       .find({
-        userId: session.user.id,
+        userId: user.id,
         date: { $gte: firstDay, $lte: lastDay },
         status: "absent",
       })
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Get user's leave quota
-    const userSettings = await getUserSettings(session.user.id);
+    const userSettings = await getUserSettings(user.id);
     const plannedLeaveQuota = userSettings?.leaveQuota?.planned || 15;
     const unplannedLeaveQuota = userSettings?.leaveQuota?.unplanned || 10;
     const parentalLeaveQuota = userSettings?.leaveQuota?.parentalLeave || 0;

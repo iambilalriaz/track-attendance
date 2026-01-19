@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getAuthenticatedUser } from "@/lib/auth-api";
 import { getMonthlyStats, autoMarkTodayAttendance } from "@/lib/db/attendance";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
+    const user = await getAuthenticatedUser();
 
-    if (!session?.user?.id || !session?.user?.email) {
+    if (!user?.id || !user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -15,9 +15,9 @@ export async function GET(request: NextRequest) {
     const month = parseInt(searchParams.get("month") || (new Date().getMonth() + 1).toString());
 
     // Auto-mark today's attendance based on user settings (if not already marked)
-    await autoMarkTodayAttendance(session.user.id, session.user.email);
+    await autoMarkTodayAttendance(user.id, user.email);
 
-    const stats = await getMonthlyStats(session.user.id, year, month);
+    const stats = await getMonthlyStats(user.id, year, month);
 
     return NextResponse.json(stats);
   } catch (error) {
