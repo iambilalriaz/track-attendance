@@ -10,6 +10,14 @@ export interface YearlyLeaveRecord {
   notes?: string;
 }
 
+// Helper function to format date as YYYY-MM-DD in local timezone
+function formatDateLocal(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const user = await getAuthenticatedUser();
@@ -23,9 +31,11 @@ export async function GET(request: NextRequest) {
 
     const collection = await getAttendanceCollection();
 
-    // Get first and last day of the year
+    // Get first and last day of the year (in local timezone)
     const firstDay = new Date(year, 0, 1);
+    firstDay.setHours(0, 0, 0, 0);
     const lastDay = new Date(year, 11, 31);
+    lastDay.setHours(23, 59, 59, 999);
 
     // Get all leave records for the year (status = absent)
     const records = await collection
@@ -60,12 +70,12 @@ export async function GET(request: NextRequest) {
       let additionalNotes = notes;
       if (notes.includes(" - ")) {
         additionalNotes = notes.split(" - ").slice(1).join(" - ");
-      } else if (["Planned Leave", "Unplanned Leave", "Parental Leave"].includes(notes)) {
+      } else if (["Planned Leave", "Unplanned Leave", "Parental Leave", "Unpaid Leave"].includes(notes)) {
         additionalNotes = "";
       }
 
       return {
-        date: date.toISOString().split("T")[0],
+        date: formatDateLocal(date),
         dayName: dayNames[date.getDay()],
         leaveType,
         notes: additionalNotes || undefined,

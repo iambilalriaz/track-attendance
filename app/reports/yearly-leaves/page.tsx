@@ -3,17 +3,27 @@
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import Navigation from '@/components/Navigation';
+import ConfirmDialog from '@/components/ConfirmDialog';
+import LeaveBottomSheet, { LeaveToEdit } from '@/components/LeaveBottomSheet';
 import {
   YearlyLeavesReportData,
   generateYearlyLeavesReportHTML,
   exportToPDF,
 } from '@/lib/pdf-export';
+import toast from 'react-hot-toast';
 
 export default function YearlyLeavesReportPage() {
   const { data: session } = useSession();
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState<YearlyLeavesReportData | null>(null);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean;
+    date: string | null;
+  }>({ isOpen: false, date: null });
+  const [deletingDate, setDeletingDate] = useState<string | null>(null);
+  const [isLeaveSheetOpen, setIsLeaveSheetOpen] = useState(false);
+  const [editData, setEditData] = useState<LeaveToEdit | null>(null);
 
   const currentYear = new Date().getFullYear();
   // Include years from 4 years ago up to next year (dynamic range)
@@ -23,7 +33,7 @@ export default function YearlyLeavesReportPage() {
     try {
       setLoading(true);
       const response = await fetch(
-        `/api/attendance/yearly-leaves-report?year=${selectedYear}`
+        `/api/attendance/yearly-leaves-report?year=${selectedYear}`,
       );
       if (response.ok) {
         const data = await response.json();
@@ -41,6 +51,61 @@ export default function YearlyLeavesReportPage() {
     fetchReport();
   }, []);
 
+  const handleDeleteClick = (date: string) => {
+    setDeleteConfirm({ isOpen: true, date });
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirm.date) return;
+
+    const date = deleteConfirm.date;
+    try {
+      setDeletingDate(date);
+      const response = await fetch(`/api/attendance/leave?date=${date}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        // Refresh the report
+        fetchReport();
+      } else {
+        toast.error('Failed to delete leave');
+      }
+    } catch (error) {
+      console.error('Error deleting leave:', error);
+      toast.error('Failed to delete leave');
+    } finally {
+      setDeletingDate(null);
+      setDeleteConfirm({ isOpen: false, date: null });
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteConfirm({ isOpen: false, date: null });
+  };
+
+  const handleEditClick = (record: {
+    date: string;
+    leaveType: string;
+    notes?: string;
+  }) => {
+    setEditData({
+      date: record.date,
+      leaveType: record.leaveType,
+      notes: record.notes,
+    });
+    setIsLeaveSheetOpen(true);
+  };
+
+  const handleCloseSheet = () => {
+    setIsLeaveSheetOpen(false);
+    setEditData(null);
+  };
+
+  const handleLeaveUpdated = () => {
+    fetchReport();
+  };
+
   const handleExportPDF = async () => {
     if (!session?.user) return;
 
@@ -48,14 +113,14 @@ export default function YearlyLeavesReportPage() {
       setLoading(true);
       // Always fetch fresh data with current filter selections
       const response = await fetch(
-        `/api/attendance/yearly-leaves-report?year=${selectedYear}`
+        `/api/attendance/yearly-leaves-report?year=${selectedYear}`,
       );
       if (response.ok) {
         const data: YearlyLeavesReportData = await response.json();
         const html = generateYearlyLeavesReportHTML(
           data,
           session.user.name || 'User',
-          session.user.email || ''
+          session.user.email || '',
         );
         exportToPDF(html, `yearly-leaves-report-${data.year}.pdf`);
       }
@@ -138,7 +203,7 @@ export default function YearlyLeavesReportPage() {
                 <button
                   onClick={fetchReport}
                   disabled={loading}
-                  className='flex items-center justify-center gap-2 rounded-xl bg-zinc-900 px-6 py-2.5 font-semibold text-white shadow-lg transition-all hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-700 dark:hover:bg-zinc-600'
+                  className='flex items-center justify-center gap-2 rounded-xl bg-amber-400 px-6 py-2.5 font-semibold text-black shadow-lg transition-all hover:bg-amber-500 disabled:opacity-50'
                 >
                   <svg
                     className='h-5 w-5'
@@ -297,6 +362,9 @@ export default function YearlyLeavesReportPage() {
                         <th className='px-6 py-4 text-left text-sm font-semibold text-zinc-900 dark:text-white'>
                           Notes
                         </th>
+                        <th className='px-6 py-4 text-center text-sm font-semibold text-zinc-900 dark:text-white'>
+                          Actions
+                        </th>
                       </tr>
                     </thead>
                     <tbody className='divide-y divide-zinc-200/50 dark:divide-zinc-700/50'>
@@ -325,6 +393,49 @@ export default function YearlyLeavesReportPage() {
                           <td className='px-6 py-4 text-sm text-zinc-500 dark:text-zinc-400 max-w-xs truncate'>
                             {record.notes || '-'}
                           </td>
+                          <td className='px-6 py-4 text-center'>
+                            <div className='flex items-center justify-center gap-1'>
+                              <button
+                                onClick={() => handleEditClick(record)}
+                                className='inline-flex items-center justify-center rounded-lg p-2 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-200 transition-colors'
+                                title='Edit leave'
+                              >
+                                <svg
+                                  className='h-4 w-4'
+                                  fill='none'
+                                  stroke='currentColor'
+                                  viewBox='0 0 24 24'
+                                >
+                                  <path
+                                    strokeLinecap='round'
+                                    strokeLinejoin='round'
+                                    strokeWidth={2}
+                                    d='M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z'
+                                  />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteClick(record.date)}
+                                disabled={deletingDate === record.date}
+                                className='inline-flex items-center justify-center rounded-lg p-2 text-red-500 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300 transition-colors disabled:opacity-50'
+                                title='Delete leave'
+                              >
+                                <svg
+                                  className='h-4 w-4'
+                                  fill='none'
+                                  stroke='currentColor'
+                                  viewBox='0 0 24 24'
+                                >
+                                  <path
+                                    strokeLinecap='round'
+                                    strokeLinejoin='round'
+                                    strokeWidth={2}
+                                    d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'
+                                  />
+                                </svg>
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -352,12 +463,53 @@ export default function YearlyLeavesReportPage() {
                             {record.dayName}
                           </p>
                         </div>
-                        <span
-                          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${getLeaveTypeStyle(record.leaveType)}`}
-                        >
-                          <span>{getLeaveTypeIcon(record.leaveType)}</span>
-                          {record.leaveType}
-                        </span>
+                        <div className='flex items-center gap-2'>
+                          <span
+                            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${getLeaveTypeStyle(record.leaveType)}`}
+                          >
+                            <span>{getLeaveTypeIcon(record.leaveType)}</span>
+                            {record.leaveType}
+                          </span>
+                          <button
+                            onClick={() => handleEditClick(record)}
+                            className='inline-flex items-center justify-center rounded-lg p-2 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-200 transition-colors'
+                            title='Edit leave'
+                          >
+                            <svg
+                              className='h-4 w-4'
+                              fill='none'
+                              stroke='currentColor'
+                              viewBox='0 0 24 24'
+                            >
+                              <path
+                                strokeLinecap='round'
+                                strokeLinejoin='round'
+                                strokeWidth={2}
+                                d='M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z'
+                              />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteClick(record.date)}
+                            disabled={deletingDate === record.date}
+                            className='inline-flex items-center justify-center rounded-lg p-2 text-red-500 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300 transition-colors disabled:opacity-50'
+                            title='Delete leave'
+                          >
+                            <svg
+                              className='h-4 w-4'
+                              fill='none'
+                              stroke='currentColor'
+                              viewBox='0 0 24 24'
+                            >
+                              <path
+                                strokeLinecap='round'
+                                strokeLinejoin='round'
+                                strokeWidth={2}
+                                d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'
+                              />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                       {record.notes && (
                         <p className='mt-2 text-sm text-zinc-500 dark:text-zinc-400 border-t border-zinc-200/50 dark:border-zinc-700/50 pt-2'>
@@ -384,6 +536,27 @@ export default function YearlyLeavesReportPage() {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        title='Delete Leave'
+        message='Are you sure you want to delete this leave? This action cannot be undone.'
+        confirmLabel='Delete'
+        cancelLabel='Cancel'
+        confirmVariant='danger'
+        isLoading={deletingDate === deleteConfirm.date}
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+      />
+
+      {/* Edit Leave Bottom Sheet */}
+      <LeaveBottomSheet
+        isOpen={isLeaveSheetOpen}
+        onClose={handleCloseSheet}
+        onLeaveRequested={handleLeaveUpdated}
+        editData={editData}
+      />
     </>
   );
 }

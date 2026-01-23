@@ -74,7 +74,6 @@ export function generateMonthlyReportHTML(
           ${statusLabels[record.status] || record.status}
         </span>
       </td>
-      <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; color: #6b7280; font-size: 13px;">${record.notes || "-"}</td>
     </tr>
   `
     )
@@ -136,7 +135,6 @@ export function generateMonthlyReportHTML(
               <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #e5e7eb;">Date</th>
               <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #e5e7eb;">Day</th>
               <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #e5e7eb;">Status</th>
-              <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #e5e7eb;">Notes</th>
             </tr>
           </thead>
           <tbody>
@@ -178,7 +176,6 @@ export function generateYearlyLeavesReportHTML(
           ${record.leaveType}
         </span>
       </td>
-      <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; color: #6b7280; font-size: 13px;">${record.notes || "-"}</td>
     </tr>
   `
     )
@@ -260,7 +257,6 @@ export function generateYearlyLeavesReportHTML(
               <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #e5e7eb;">Date</th>
               <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #e5e7eb;">Day</th>
               <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #e5e7eb;">Leave Type</th>
-              <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #e5e7eb;">Notes</th>
             </tr>
           </thead>
           <tbody>

@@ -9,6 +9,14 @@ export interface MonthlyReportRecord {
   notes?: string;
 }
 
+// Helper function to format date as YYYY-MM-DD in local timezone
+function formatDateLocal(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const user = await getAuthenticatedUser();
@@ -23,9 +31,11 @@ export async function GET(request: NextRequest) {
 
     const collection = await getAttendanceCollection();
 
-    // Get first and last day of the month
+    // Get first and last day of the month (in local timezone)
     const firstDay = new Date(year, month - 1, 1);
+    firstDay.setHours(0, 0, 0, 0);
     const lastDay = new Date(year, month, 0);
+    lastDay.setHours(23, 59, 59, 999);
 
     // Get all attendance records for the month
     const records = await collection
@@ -40,18 +50,23 @@ export async function GET(request: NextRequest) {
     const reportData: MonthlyReportRecord[] = [];
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-    for (let d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate() + 1)) {
-      const dayOfWeek = d.getDay();
+    // Iterate through each day of the month
+    for (let dayNum = 1; dayNum <= lastDay.getDate(); dayNum++) {
+      const currentDate = new Date(year, month - 1, dayNum);
+      const dayOfWeek = currentDate.getDay();
 
       // Skip weekends
       if (dayOfWeek === 0 || dayOfWeek === 6) {
         continue;
       }
 
-      const dateStr = d.toISOString().split("T")[0];
-      const record = records.find(
-        (r) => new Date(r.date).toISOString().split("T")[0] === dateStr
-      );
+      const dateStr = formatDateLocal(currentDate);
+
+      // Find matching record by comparing dates in local timezone
+      const record = records.find((r) => {
+        const recordDate = new Date(r.date);
+        return formatDateLocal(recordDate) === dateStr;
+      });
 
       reportData.push({
         date: dateStr,

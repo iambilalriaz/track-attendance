@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { AttendanceStatus } from '@/models/Attendance';
 import LeaveBottomSheet from './LeaveBottomSheet';
+import toast from 'react-hot-toast';
 
 interface MarkAttendanceProps {
   currentStatus?: AttendanceStatus;
@@ -51,11 +52,11 @@ export default function MarkAttendance({
       if (response.ok) {
         onAttendanceMarked();
       } else {
-        alert('Failed to update work mode');
+        toast.error('Failed to update work mode');
       }
     } catch (error) {
       console.error('Error updating work mode:', error);
-      alert('Failed to update work mode');
+      toast.error('Failed to update work mode');
     } finally {
       setUpdating(false);
     }

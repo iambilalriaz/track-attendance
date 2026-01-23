@@ -3,11 +3,21 @@
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import Navigation from '@/components/Navigation';
+import UpdateStatusDialog from '@/components/UpdateStatusDialog';
+import ConfirmDialog from '@/components/ConfirmDialog';
 import {
   MonthlyReportData,
   generateMonthlyReportHTML,
   exportToPDF,
 } from '@/lib/pdf-export';
+import toast from 'react-hot-toast';
+
+interface EditStatusState {
+  isOpen: boolean;
+  date: string;
+  dayName: string;
+  currentStatus: string;
+}
 
 export default function MonthlyWorkModeReportPage() {
   const { data: session } = useSession();
@@ -15,6 +25,14 @@ export default function MonthlyWorkModeReportPage() {
   const [report, setReport] = useState<MonthlyReportData | null>(null);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [editStatus, setEditStatus] = useState<EditStatusState>({
+    isOpen: false,
+    date: '',
+    dayName: '',
+    currentStatus: '',
+  });
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const currentYear = new Date().getFullYear();
   // Include years from 4 years ago up to next year (dynamic range)
@@ -38,7 +56,7 @@ export default function MonthlyWorkModeReportPage() {
     try {
       setLoading(true);
       const response = await fetch(
-        `/api/attendance/monthly-report?year=${selectedYear}&month=${selectedMonth}`
+        `/api/attendance/monthly-report?year=${selectedYear}&month=${selectedMonth}`,
       );
       if (response.ok) {
         const data = await response.json();
@@ -56,6 +74,89 @@ export default function MonthlyWorkModeReportPage() {
     fetchReport();
   }, []);
 
+  const handleOpenEditDialog = (record: {
+    date: string;
+    dayName: string;
+    status: string;
+  }) => {
+    setEditStatus({
+      isOpen: true,
+      date: record.date,
+      dayName: record.dayName,
+      currentStatus: record.status,
+    });
+  };
+
+  const handleCloseEditDialog = () => {
+    setEditStatus({
+      isOpen: false,
+      date: '',
+      dayName: '',
+      currentStatus: '',
+    });
+  };
+
+  const handleUpdateStatus = async (newStatus: 'present' | 'wfh') => {
+    try {
+      setUpdatingStatus(true);
+      const response = await fetch('/api/attendance/mark', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: new Date(editStatus.date).toISOString(),
+          status: newStatus,
+        }),
+      });
+
+      if (response.ok) {
+        handleCloseEditDialog();
+        // Refresh the report to show updated status
+        fetchReport();
+      } else {
+        toast.error('Failed to update work status');
+      }
+    } catch (error) {
+      console.error('Error updating work status:', error);
+      toast.error('Failed to update work status');
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const handleSync = async () => {
+    try {
+      setSyncing(true);
+      const response = await fetch('/api/attendance/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          year: selectedYear,
+          month: selectedMonth,
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        // Refresh the report to show updated data
+        await fetchReport();
+        if (result.synced > 0) {
+          toast.success(
+            `Synced ${result.synced} unmarked dates based on your default work mode settings.`,
+          );
+        } else {
+          toast.success('All dates are already marked. Nothing to sync.');
+        }
+      } else {
+        toast.error('Failed to sync attendance');
+      }
+    } catch (error) {
+      console.error('Error syncing attendance:', error);
+      toast.error('Failed to sync attendance');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const handleExportPDF = async () => {
     if (!session?.user) return;
 
@@ -63,16 +164,19 @@ export default function MonthlyWorkModeReportPage() {
       setLoading(true);
       // Always fetch fresh data with current filter selections
       const response = await fetch(
-        `/api/attendance/monthly-report?year=${selectedYear}&month=${selectedMonth}`
+        `/api/attendance/monthly-report?year=${selectedYear}&month=${selectedMonth}`,
       );
       if (response.ok) {
         const data: MonthlyReportData = await response.json();
         const html = generateMonthlyReportHTML(
           data,
           session.user.name || 'User',
-          session.user.email || ''
+          session.user.email || '',
         );
-        exportToPDF(html, `work-mode-report-${data.monthName}-${data.year}.pdf`);
+        exportToPDF(
+          html,
+          `work-mode-report-${data.monthName}-${data.year}.pdf`,
+        );
       }
     } catch (error) {
       console.error('Error exporting report:', error);
@@ -118,6 +222,14 @@ export default function MonthlyWorkModeReportPage() {
       default:
         return '⏳';
     }
+  };
+
+  const isFutureDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    date.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return date > today;
   };
 
   return (
@@ -174,7 +286,7 @@ export default function MonthlyWorkModeReportPage() {
                 <button
                   onClick={fetchReport}
                   disabled={loading}
-                  className='flex items-center justify-center gap-2 rounded-xl bg-zinc-900 px-6 py-2.5 font-semibold text-white shadow-lg transition-all hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-700 dark:hover:bg-zinc-600'
+                  className='flex items-center justify-center gap-2 rounded-xl bg-amber-400 px-6 py-2.5 font-semibold text-black shadow-lg transition-all hover:bg-amber-500 disabled:opacity-50'
                 >
                   <svg
                     className='h-5 w-5'
@@ -193,26 +305,53 @@ export default function MonthlyWorkModeReportPage() {
                 </button>
               </div>
 
-              <button
-                onClick={handleExportPDF}
-                disabled={!report || loading}
-                className='flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-2.5 font-semibold text-white shadow-lg transition-all hover:from-blue-700 hover:to-blue-800 disabled:opacity-50'
-              >
-                <svg
-                  className='h-5 w-5'
-                  fill='none'
-                  stroke='currentColor'
-                  viewBox='0 0 24 24'
+              <div className='flex flex-col gap-3 sm:flex-row'>
+                <button
+                  onClick={handleSync}
+                  disabled={loading || syncing}
+                  className='flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-6 py-2.5 font-semibold text-white shadow-lg transition-all hover:from-emerald-700 hover:to-emerald-800 disabled:opacity-50'
+                  title='Fill unmarked dates with default work mode'
                 >
-                  <path
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                    strokeWidth={2}
-                    d='M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'
-                  />
-                </svg>
-                Export PDF
-              </button>
+                  {syncing ? (
+                    <div className='h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent'></div>
+                  ) : (
+                    <svg
+                      className='h-5 w-5'
+                      fill='none'
+                      stroke='currentColor'
+                      viewBox='0 0 24 24'
+                    >
+                      <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        strokeWidth={2}
+                        d='M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15'
+                      />
+                    </svg>
+                  )}
+                  Sync
+                </button>
+                <button
+                  onClick={handleExportPDF}
+                  disabled={!report || loading}
+                  className='flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-2.5 font-semibold text-white shadow-lg transition-all hover:from-blue-700 hover:to-blue-800 disabled:opacity-50'
+                >
+                  <svg
+                    className='h-5 w-5'
+                    fill='none'
+                    stroke='currentColor'
+                    viewBox='0 0 24 24'
+                  >
+                    <path
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth={2}
+                      d='M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'
+                    />
+                  </svg>
+                  Export PDF
+                </button>
+              </div>
             </div>
           </div>
 
@@ -279,6 +418,9 @@ export default function MonthlyWorkModeReportPage() {
                       <th className='px-6 py-4 text-left text-sm font-semibold text-zinc-900 dark:text-white'>
                         Notes
                       </th>
+                      <th className='px-6 py-4 text-center text-sm font-semibold text-zinc-900 dark:text-white'>
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody className='divide-y divide-zinc-200/50 dark:divide-zinc-700/50'>
@@ -307,6 +449,29 @@ export default function MonthlyWorkModeReportPage() {
                         <td className='px-6 py-4 text-sm text-zinc-500 dark:text-zinc-400'>
                           {record.notes || '-'}
                         </td>
+                        <td className='px-6 py-4 text-center'>
+                          {!isFutureDate(record.date) && (
+                            <button
+                              onClick={() => handleOpenEditDialog(record)}
+                              className='inline-flex items-center justify-center rounded-lg p-2 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-200 transition-colors'
+                              title='Edit status'
+                            >
+                              <svg
+                                className='h-4 w-4'
+                                fill='none'
+                                stroke='currentColor'
+                                viewBox='0 0 24 24'
+                              >
+                                <path
+                                  strokeLinecap='round'
+                                  strokeLinejoin='round'
+                                  strokeWidth={2}
+                                  d='M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z'
+                                />
+                              </svg>
+                            </button>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -332,12 +497,35 @@ export default function MonthlyWorkModeReportPage() {
                           {record.dayName}
                         </p>
                       </div>
-                      <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${getStatusStyle(record.status)}`}
-                      >
-                        <span>{getStatusIcon(record.status)}</span>
-                        {getStatusLabel(record.status)}
-                      </span>
+                      <div className='flex items-center gap-2'>
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${getStatusStyle(record.status)}`}
+                        >
+                          <span>{getStatusIcon(record.status)}</span>
+                          {getStatusLabel(record.status)}
+                        </span>
+                        {!isFutureDate(record.date) && (
+                          <button
+                            onClick={() => handleOpenEditDialog(record)}
+                            className='inline-flex items-center justify-center rounded-lg p-2 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-200 transition-colors'
+                            title='Edit status'
+                          >
+                            <svg
+                              className='h-4 w-4'
+                              fill='none'
+                              stroke='currentColor'
+                              viewBox='0 0 24 24'
+                            >
+                              <path
+                                strokeLinecap='round'
+                                strokeLinejoin='round'
+                                strokeWidth={2}
+                                d='M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z'
+                              />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
                     </div>
                     {record.notes && (
                       <p className='mt-2 text-sm text-zinc-500 dark:text-zinc-400 border-t border-zinc-200/50 dark:border-zinc-700/50 pt-2'>
@@ -359,6 +547,17 @@ export default function MonthlyWorkModeReportPage() {
           )}
         </div>
       </div>
+
+      {/* Update Status Dialog */}
+      <UpdateStatusDialog
+        isOpen={editStatus.isOpen}
+        currentStatus={editStatus.currentStatus}
+        date={editStatus.date}
+        dayName={editStatus.dayName}
+        isLoading={updatingStatus}
+        onUpdate={handleUpdateStatus}
+        onCancel={handleCloseEditDialog}
+      />
     </>
   );
 }
