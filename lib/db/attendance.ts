@@ -20,12 +20,18 @@ export async function getMonthlyStats(
   const lastDay = new Date(year, month, 0);
 
   // Get all attendance records for the month
-  const records = await collection
+  const allRecords = await collection
     .find({
       userId,
       date: { $gte: firstDay, $lte: lastDay },
     })
     .toArray();
+
+  // Filter out weekend records (only count weekdays)
+  const records = allRecords.filter((r) => {
+    const dayOfWeek = new Date(r.date).getUTCDay();
+    return dayOfWeek !== 0 && dayOfWeek !== 6; // Exclude Sunday (0) and Saturday (6)
+  });
 
   // Calculate weekdays in the month (excluding weekends)
   const weekdays = getWeekdaysInMonth(year, month);
@@ -127,14 +133,22 @@ export async function markAttendance(
 ): Promise<Attendance> {
   const collection = await getAttendanceCollection();
 
-  // Normalize date to start of day
-  const normalizedDate = new Date(date);
-  normalizedDate.setHours(0, 0, 0, 0);
+  // Extract year, month, day from the input date
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const day = date.getDate();
 
-  // Check if attendance already exists for this date
+  // Create UTC noon date for consistent storage
+  const normalizedDate = new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
+
+  // Create date range for finding existing records (any time on this calendar day)
+  const dayStart = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
+  const dayEnd = new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
+
+  // Check if attendance already exists for this date using date range
   const existing = await collection.findOne({
     userId,
-    date: normalizedDate,
+    date: { $gte: dayStart, $lte: dayEnd },
   });
 
   const now = new Date();
@@ -184,11 +198,17 @@ export async function getTodayAttendance(
   const collection = await getAttendanceCollection();
 
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  const day = today.getDate();
+
+  // Use date range to find any record for today regardless of stored time
+  const dayStart = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
+  const dayEnd = new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
 
   return await collection.findOne({
     userId,
-    date: today,
+    date: { $gte: dayStart, $lte: dayEnd },
   });
 }
 
@@ -224,11 +244,20 @@ export async function getExistingAttendanceInRange(
 ): Promise<{ date: Date; status: string }[]> {
   const collection = await getAttendanceCollection();
 
-  const start = new Date(startDate);
-  start.setHours(0, 0, 0, 0);
+  // Use UTC dates for consistent querying
+  const start = new Date(Date.UTC(
+    startDate.getFullYear(),
+    startDate.getMonth(),
+    startDate.getDate(),
+    0, 0, 0, 0
+  ));
 
-  const end = new Date(endDate);
-  end.setHours(23, 59, 59, 999);
+  const end = new Date(Date.UTC(
+    endDate.getFullYear(),
+    endDate.getMonth(),
+    endDate.getDate(),
+    23, 59, 59, 999
+  ));
 
   const records = await collection
     .find({

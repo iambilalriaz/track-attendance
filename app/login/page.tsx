@@ -1,6 +1,7 @@
 import { signIn } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
+import Image from 'next/image';
 
 export default async function LoginPage() {
   const session = await auth();
@@ -14,6 +15,15 @@ export default async function LoginPage() {
     <div className='flex min-h-screen items-center justify-center bg-linear-to-br from-zinc-50 to-zinc-100 dark:from-zinc-900 dark:to-black'>
       <div className='w-full max-w-md mx-4 space-y-8 rounded-2xl bg-white px-10 py-12 shadow-xl dark:bg-zinc-800'>
         <div className='text-center mb-2'>
+          <div className='flex justify-center mb-4'>
+            <Image
+              src='/track-attendance-logo.png'
+              alt='Track Attendance'
+              width={80}
+              height={80}
+              className='rounded-2xl shadow-lg'
+            />
+          </div>
           <h1 className='text-3xl font-bold tracking-tight text-zinc-900 dark:text-white'>
             Track Attendance
           </h1>

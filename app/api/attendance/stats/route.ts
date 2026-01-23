@@ -19,7 +19,11 @@ export async function GET(request: NextRequest) {
 
     const stats = await getMonthlyStats(user.id, year, month);
 
-    return NextResponse.json(stats);
+    return NextResponse.json(stats, {
+      headers: {
+        'Cache-Control': 'no-store, max-age=0',
+      },
+    });
   } catch (error) {
     console.error("Error fetching attendance stats:", error);
     return NextResponse.json(

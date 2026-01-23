@@ -33,6 +33,7 @@ export default function MonthlyWorkModeReportPage() {
   });
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [showSyncConfirm, setShowSyncConfirm] = useState(false);
 
   const currentYear = new Date().getFullYear();
   // Include years from 4 years ago up to next year (dynamic range)
@@ -154,6 +155,7 @@ export default function MonthlyWorkModeReportPage() {
       toast.error('Failed to sync attendance');
     } finally {
       setSyncing(false);
+      setShowSyncConfirm(false);
     }
   };
 
@@ -307,7 +309,7 @@ export default function MonthlyWorkModeReportPage() {
 
               <div className='flex flex-col gap-3 sm:flex-row'>
                 <button
-                  onClick={handleSync}
+                  onClick={() => setShowSyncConfirm(true)}
                   disabled={loading || syncing}
                   className='flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-6 py-2.5 font-semibold text-white shadow-lg transition-all hover:from-emerald-700 hover:to-emerald-800 disabled:opacity-50'
                   title='Fill unmarked dates with default work mode'
@@ -557,6 +559,19 @@ export default function MonthlyWorkModeReportPage() {
         isLoading={updatingStatus}
         onUpdate={handleUpdateStatus}
         onCancel={handleCloseEditDialog}
+      />
+
+      {/* Sync Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showSyncConfirm}
+        title='Sync Work Mode'
+        message='This will automatically mark all unmarked working days from the start of the selected month until today based on your default schedule settings. Any dates you have already marked will remain unchanged.'
+        confirmLabel='Yes, Sync'
+        cancelLabel='Cancel'
+        confirmVariant='primary'
+        isLoading={syncing}
+        onConfirm={handleSync}
+        onCancel={() => setShowSyncConfirm(false)}
       />
     </>
   );

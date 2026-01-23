@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
   try {
     const user = await getAuthenticatedUser();
 
-    if (!user?.id) {
+    if (!user?.id || !user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -47,11 +47,10 @@ export async function POST(request: NextRequest) {
 
     const collection = await getAttendanceCollection();
 
-    // Get first and last day of the month
-    const firstDay = new Date(year, month - 1, 1);
-    firstDay.setHours(0, 0, 0, 0);
-    const lastDay = new Date(year, month, 0);
-    lastDay.setHours(23, 59, 59, 999);
+    // Get first and last day of the month (using UTC)
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const firstDay = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
+    const lastDay = new Date(Date.UTC(year, month - 1, daysInMonth, 23, 59, 59, 999));
 
     // Get existing attendance records for the month
     const existingRecords = await collection
@@ -70,14 +69,16 @@ export async function POST(request: NextRequest) {
     const syncedDates: string[] = [];
     const skippedDates: string[] = [];
 
-    // Get today's date at midnight for comparison
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Get today's date for comparison (local date)
+    const now = new Date();
+    const todayYear = now.getFullYear();
+    const todayMonth = now.getMonth() + 1;
+    const todayDay = now.getDate();
 
     // Iterate through each day of the month
-    for (let dayNum = 1; dayNum <= lastDay.getDate(); dayNum++) {
+    for (let dayNum = 1; dayNum <= daysInMonth; dayNum++) {
+      // Use local date for day of week calculation
       const currentDate = new Date(year, month - 1, dayNum);
-      currentDate.setHours(0, 0, 0, 0);
       const dayOfWeek = currentDate.getDay();
 
       // Skip weekends
@@ -86,7 +87,13 @@ export async function POST(request: NextRequest) {
       }
 
       // Skip today and future dates - only sync past dates
-      if (currentDate >= today) {
+      // Compare using year, month, day directly to avoid timezone issues
+      const isCurrentOrFuture =
+        year > todayYear ||
+        (year === todayYear && month > todayMonth) ||
+        (year === todayYear && month === todayMonth && dayNum >= todayDay);
+
+      if (isCurrentOrFuture) {
         continue;
       }
 
@@ -104,24 +111,35 @@ export async function POST(request: NextRequest) {
       const isWfhDay = defaultWfhDays.includes(dayName);
       const status = isWfhDay ? "wfh" : "present";
 
-      // Create or update the attendance record
-      const dateForDb = new Date(year, month - 1, dayNum, 12, 0, 0, 0);
+      // Create date range for this calendar day to avoid duplicates (using UTC)
+      const dayStart = new Date(Date.UTC(year, month - 1, dayNum, 0, 0, 0, 0));
+      const dayEnd = new Date(Date.UTC(year, month - 1, dayNum, 23, 59, 59, 999));
 
-      await collection.updateOne(
-        { userId: user.id, date: dateForDb },
-        {
-          $set: {
-            userId: user.id,
-            date: dateForDb,
-            status,
-            updatedAt: new Date(),
-          },
-          $setOnInsert: {
-            createdAt: new Date(),
-          },
-        },
-        { upsert: true }
-      );
+      // Double-check no record exists for this date using date range query
+      const existsInDb = await collection.findOne({
+        userId: user.id,
+        date: { $gte: dayStart, $lte: dayEnd },
+      });
+
+      if (existsInDb) {
+        skippedDates.push(dateStr);
+        continue;
+      }
+
+      // Insert new attendance record (not upsert to avoid duplicates)
+      // Use UTC noon to ensure consistent timezone handling
+      const dateForDb = new Date(Date.UTC(year, month - 1, dayNum, 12, 0, 0, 0));
+      const now = new Date();
+
+      await collection.insertOne({
+        userId: user.id,
+        userEmail: user.email,
+        date: dateForDb,
+        status,
+        notes: "Synced",
+        createdAt: now,
+        updatedAt: now,
+      });
 
       syncedDates.push(dateStr);
     }

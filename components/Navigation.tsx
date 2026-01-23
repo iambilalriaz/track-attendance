@@ -42,9 +42,13 @@ export default function Navigation() {
           {/* Logo and Nav Items */}
           <div className="flex items-center gap-8">
             <Link href="/dashboard" className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-sm font-bold shadow-md">
-                TA
-              </div>
+              <Image
+                src="/track-attendance-logo.png"
+                alt="Track Attendance"
+                width={36}
+                height={36}
+                className="rounded-lg"
+              />
               <span className="text-xl font-bold text-zinc-900 dark:text-white">
                 Track Attendance
               </span>
@@ -157,9 +161,13 @@ export default function Navigation() {
         {/* Sidebar Header */}
         <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 p-4">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-sm font-bold shadow-md">
-              TA
-            </div>
+            <Image
+              src="/track-attendance-logo.png"
+              alt="Track Attendance"
+              width={32}
+              height={32}
+              className="rounded-lg"
+            />
             <span className="text-lg font-bold text-zinc-900 dark:text-white">
               Track Attendance
             </span>
