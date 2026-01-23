@@ -1,16 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth-api";
-import { getAttendanceCollection } from "@/lib/db/attendance";
+import { getAttendanceCollection, formatDateUTC, createUTCNoonDate, getUTCDayRange, getTodayUTC } from "@/lib/db/attendance";
 import { getUserSettings } from "@/lib/db/user-settings";
 import { DayOfWeek } from "@/models/User";
-
-// Helper function to format date as YYYY-MM-DD in local timezone
-function formatDateLocal(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
 
 // Map day index to day name
 const dayIndexToName: Record<number, DayOfWeek> = {
@@ -48,7 +40,7 @@ export async function POST(request: NextRequest) {
     const collection = await getAttendanceCollection();
 
     // Get first and last day of the month (using UTC)
-    const daysInMonth = new Date(year, month, 0).getDate();
+    const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
     const firstDay = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
     const lastDay = new Date(Date.UTC(year, month - 1, daysInMonth, 23, 59, 59, 999));
 
@@ -60,26 +52,26 @@ export async function POST(request: NextRequest) {
       })
       .toArray();
 
-    // Create a map of existing records by date string
+    // Create a map of existing records by date string using UTC formatting
     const existingByDate = new Map(
-      existingRecords.map((r) => [formatDateLocal(new Date(r.date)), r])
+      existingRecords.map((r) => [formatDateUTC(new Date(r.date)), r])
     );
 
     // Track synced dates
     const syncedDates: string[] = [];
     const skippedDates: string[] = [];
 
-    // Get today's date for comparison (local date)
-    const now = new Date();
-    const todayYear = now.getFullYear();
-    const todayMonth = now.getMonth() + 1;
-    const todayDay = now.getDate();
+    // Get today's date for comparison using UTC
+    const todayUTC = getTodayUTC();
+    const todayYear = todayUTC.year;
+    const todayMonth = todayUTC.month + 1; // Convert to 1-indexed month
+    const todayDay = todayUTC.day;
 
     // Iterate through each day of the month
     for (let dayNum = 1; dayNum <= daysInMonth; dayNum++) {
-      // Use local date for day of week calculation
-      const currentDate = new Date(year, month - 1, dayNum);
-      const dayOfWeek = currentDate.getDay();
+      // Use UTC date for day of week calculation
+      const currentDate = new Date(Date.UTC(year, month - 1, dayNum, 12, 0, 0, 0));
+      const dayOfWeek = currentDate.getUTCDay();
 
       // Skip weekends
       if (dayOfWeek === 0 || dayOfWeek === 6) {
@@ -97,7 +89,7 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const dateStr = formatDateLocal(currentDate);
+      const dateStr = formatDateUTC(currentDate);
       const existingRecord = existingByDate.get(dateStr);
 
       // Skip if already marked (present, wfh, or absent/leave)
@@ -112,8 +104,7 @@ export async function POST(request: NextRequest) {
       const status = isWfhDay ? "wfh" : "present";
 
       // Create date range for this calendar day to avoid duplicates (using UTC)
-      const dayStart = new Date(Date.UTC(year, month - 1, dayNum, 0, 0, 0, 0));
-      const dayEnd = new Date(Date.UTC(year, month - 1, dayNum, 23, 59, 59, 999));
+      const { start: dayStart, end: dayEnd } = getUTCDayRange(year, month - 1, dayNum);
 
       // Double-check no record exists for this date using date range query
       const existsInDb = await collection.findOne({
@@ -128,7 +119,7 @@ export async function POST(request: NextRequest) {
 
       // Insert new attendance record (not upsert to avoid duplicates)
       // Use UTC noon to ensure consistent timezone handling
-      const dateForDb = new Date(Date.UTC(year, month - 1, dayNum, 12, 0, 0, 0));
+      const dateForDb = createUTCNoonDate(year, month - 1, dayNum);
       const now = new Date();
 
       await collection.insertOne({

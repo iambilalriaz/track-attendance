@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth-api";
-import { markAttendance, getExistingAttendanceInRange, getLeaveStats } from "@/lib/db/attendance";
+import { markAttendance, getExistingAttendanceInRange, getLeaveStats, normalizeToUTCNoon } from "@/lib/db/attendance";
 import { getUserSettings } from "@/lib/db/user-settings";
 
 export async function POST(request: NextRequest) {
@@ -28,8 +28,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    // Normalize dates to UTC noon for consistent handling
+    const start = normalizeToUTCNoon(new Date(startDate));
+    const end = normalizeToUTCNoon(new Date(endDate));
 
     if (end < start) {
       return NextResponse.json(
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
 
     // Filter to only weekday records that are already leaves (absent status)
     const existingLeaves = existingRecords.filter((r) => {
-      const dayOfWeek = new Date(r.date).getDay();
+      const dayOfWeek = new Date(r.date).getUTCDay();
       return dayOfWeek !== 0 && dayOfWeek !== 6 && r.status === "absent";
     });
 
@@ -70,19 +71,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Count requested weekdays
+    // Count requested weekdays using UTC methods
     let requestedDays = 0;
-    const tempDate = new Date(start);
+    const tempDate = new Date(start.getTime());
     while (tempDate <= end) {
-      const dayOfWeek = tempDate.getDay();
+      const dayOfWeek = tempDate.getUTCDay();
       if (dayOfWeek !== 0 && dayOfWeek !== 6) {
         requestedDays++;
       }
-      tempDate.setDate(tempDate.getDate() + 1);
+      tempDate.setUTCDate(tempDate.getUTCDate() + 1);
     }
 
     // Get current leave stats to check quota
-    const year = start.getFullYear();
+    const year = start.getUTCFullYear();
     const leaveStats = await getLeaveStats(user.id, year);
     const userSettings = await getUserSettings(user.id);
 
@@ -112,11 +113,11 @@ export async function POST(request: NextRequest) {
     // Calculate days and mark attendance for each day as absent (excluding weekends)
     const markedDates = [];
     const unpaidDates = [];
-    const currentDate = new Date(start);
+    const currentDate = new Date(start.getTime());
     let paidCount = 0;
 
     while (currentDate <= end) {
-      const dayOfWeek = currentDate.getDay();
+      const dayOfWeek = currentDate.getUTCDay();
 
       // Skip weekends (Saturday = 6, Sunday = 0)
       if (dayOfWeek !== 0 && dayOfWeek !== 6) {
@@ -130,20 +131,20 @@ export async function POST(request: NextRequest) {
         await markAttendance(
           user.id,
           user.email,
-          new Date(currentDate),
+          new Date(currentDate.getTime()),
           "absent",
           noteText
         );
 
         if (isUnpaid) {
-          unpaidDates.push(new Date(currentDate));
+          unpaidDates.push(new Date(currentDate.getTime()));
         } else {
-          markedDates.push(new Date(currentDate));
+          markedDates.push(new Date(currentDate.getTime()));
           paidCount++;
         }
       }
 
-      currentDate.setDate(currentDate.getDate() + 1);
+      currentDate.setUTCDate(currentDate.getUTCDate() + 1);
     }
 
     // Build response message

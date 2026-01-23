@@ -2,6 +2,64 @@ import clientPromise from "../mongodb";
 import { Attendance, AttendanceStats, LeaveStats } from "@/models/Attendance";
 import { getUserSettings } from "./user-settings";
 
+// ============================================================================
+// UTC Date Utility Functions - All dates should be normalized to UTC noon (12:00)
+// ============================================================================
+
+/**
+ * Normalizes a date to UTC noon (12:00:00.000) for consistent storage.
+ * This ensures all dates for the same calendar day are stored with the same time.
+ */
+export function normalizeToUTCNoon(date: Date): Date {
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  const day = date.getUTCDate();
+  return new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
+}
+
+/**
+ * Creates UTC noon date from year, month (0-indexed), day components.
+ */
+export function createUTCNoonDate(year: number, month: number, day: number): Date {
+  return new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
+}
+
+/**
+ * Gets the UTC date range for a specific day (start of day to end of day).
+ * Used for querying records that fall on a specific calendar day.
+ */
+export function getUTCDayRange(year: number, month: number, day: number): { start: Date; end: Date } {
+  return {
+    start: new Date(Date.UTC(year, month, day, 0, 0, 0, 0)),
+    end: new Date(Date.UTC(year, month, day, 23, 59, 59, 999)),
+  };
+}
+
+/**
+ * Gets today's date components in UTC.
+ */
+export function getTodayUTC(): { year: number; month: number; day: number; dayOfWeek: number } {
+  const now = new Date();
+  return {
+    year: now.getUTCFullYear(),
+    month: now.getUTCMonth(),
+    day: now.getUTCDate(),
+    dayOfWeek: now.getUTCDay(),
+  };
+}
+
+/**
+ * Formats a UTC date as YYYY-MM-DD string.
+ */
+export function formatDateUTC(date: Date): string {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+// ============================================================================
+
 export async function getAttendanceCollection() {
   const client = await clientPromise;
   const db = client.db("track-attendance");
@@ -15,9 +73,10 @@ export async function getMonthlyStats(
 ): Promise<AttendanceStats> {
   const collection = await getAttendanceCollection();
 
-  // Get first and last day of the month
-  const firstDay = new Date(year, month - 1, 1);
-  const lastDay = new Date(year, month, 0);
+  // Get first and last day of the month using UTC
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const firstDay = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
+  const lastDay = new Date(Date.UTC(year, month - 1, daysInMonth, 23, 59, 59, 999));
 
   // Get all attendance records for the month
   const allRecords = await collection
@@ -47,12 +106,16 @@ export async function getMonthlyStats(
   const attendanceRate =
     weekdays > 0 ? Math.round((totalWorkingDays / weekdays) * 100) : 0;
 
-  // Check today's status
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayRecord = records.find(
-    (r) => new Date(r.date).toDateString() === today.toDateString()
-  );
+  // Check today's status using UTC
+  const todayUTC = getTodayUTC();
+  const todayRecord = records.find((r) => {
+    const recordDate = new Date(r.date);
+    return (
+      recordDate.getUTCFullYear() === todayUTC.year &&
+      recordDate.getUTCMonth() === todayUTC.month &&
+      recordDate.getUTCDate() === todayUTC.day
+    );
+  });
 
   return {
     totalWorkingDays,
@@ -76,9 +139,9 @@ export async function getLeaveStats(
   const unplannedLeaveQuota = userSettings?.leaveQuota?.unplanned || 10;
   const parentalLeaveQuota = userSettings?.leaveQuota?.parentalLeave || 0;
 
-  // Get all leave records for the year
-  const firstDay = new Date(year, 0, 1);
-  const lastDay = new Date(year, 11, 31);
+  // Get all leave records for the year using UTC
+  const firstDay = new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0));
+  const lastDay = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
 
   // Get all absent records (leaves are marked as absent with specific notes)
   const records = await collection
@@ -133,17 +196,16 @@ export async function markAttendance(
 ): Promise<Attendance> {
   const collection = await getAttendanceCollection();
 
-  // Extract year, month, day from the input date
-  const year = date.getFullYear();
-  const month = date.getMonth();
-  const day = date.getDate();
+  // Extract year, month, day from the input date using UTC methods
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  const day = date.getUTCDate();
 
   // Create UTC noon date for consistent storage
-  const normalizedDate = new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
+  const normalizedDate = createUTCNoonDate(year, month, day);
 
   // Create date range for finding existing records (any time on this calendar day)
-  const dayStart = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
-  const dayEnd = new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
+  const { start: dayStart, end: dayEnd } = getUTCDayRange(year, month, day);
 
   // Check if attendance already exists for this date using date range
   const existing = await collection.findOne({
@@ -197,14 +259,11 @@ export async function getTodayAttendance(
 ): Promise<Attendance | null> {
   const collection = await getAttendanceCollection();
 
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = today.getMonth();
-  const day = today.getDate();
+  // Use UTC methods for today's date
+  const { year, month, day } = getTodayUTC();
 
   // Use date range to find any record for today regardless of stored time
-  const dayStart = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
-  const dayEnd = new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
+  const { start: dayStart, end: dayEnd } = getUTCDayRange(year, month, day);
 
   return await collection.findOne({
     userId,
@@ -244,18 +303,18 @@ export async function getExistingAttendanceInRange(
 ): Promise<{ date: Date; status: string }[]> {
   const collection = await getAttendanceCollection();
 
-  // Use UTC dates for consistent querying
+  // Use UTC methods for consistent querying
   const start = new Date(Date.UTC(
-    startDate.getFullYear(),
-    startDate.getMonth(),
-    startDate.getDate(),
+    startDate.getUTCFullYear(),
+    startDate.getUTCMonth(),
+    startDate.getUTCDate(),
     0, 0, 0, 0
   ));
 
   const end = new Date(Date.UTC(
-    endDate.getFullYear(),
-    endDate.getMonth(),
-    endDate.getDate(),
+    endDate.getUTCFullYear(),
+    endDate.getUTCMonth(),
+    endDate.getUTCDate(),
     23, 59, 59, 999
   ));
 
@@ -277,20 +336,25 @@ export async function autoMarkTodayAttendance(
   userId: string,
   userEmail: string
 ): Promise<Attendance | null> {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const dayOfWeek = today.getDay();
+  // Use UTC methods for consistent date handling
+  const { year, month, day, dayOfWeek } = getTodayUTC();
 
   // Skip weekends
   if (dayOfWeek === 0 || dayOfWeek === 6) {
     return null;
   }
 
-  // Check if already marked
-  const existing = await getTodayAttendance(userId);
+  // Check if already marked using date range (consistent with other functions)
+  const collection = await getAttendanceCollection();
+  const { start: dayStart, end: dayEnd } = getUTCDayRange(year, month, day);
+
+  const existing = await collection.findOne({
+    userId,
+    date: { $gte: dayStart, $lte: dayEnd },
+  });
+
   if (existing) {
-    return existing;
+    return existing as Attendance;
   }
 
   // Get user settings
@@ -303,6 +367,24 @@ export async function autoMarkTodayAttendance(
 
   const status = isWfhDay ? "wfh" : "present";
 
-  // Auto-mark attendance
-  return await markAttendance(userId, userEmail, today, status, "Auto-marked");
+  // Create UTC noon date for consistent storage
+  const dateForDb = createUTCNoonDate(year, month, day);
+  const timestamp = new Date();
+
+  // Insert new record directly (avoiding potential race conditions with markAttendance)
+  const newRecord: Attendance = {
+    userId,
+    userEmail,
+    date: dateForDb,
+    status,
+    notes: "Auto-marked",
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+
+  const result = await collection.insertOne(newRecord as any);
+  return {
+    ...newRecord,
+    _id: result.insertedId,
+  };
 }

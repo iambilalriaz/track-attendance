@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth-api";
-import { getAttendanceCollection } from "@/lib/db/attendance";
+import { getAttendanceCollection, getUTCDayRange, createUTCNoonDate } from "@/lib/db/attendance";
 
 // DELETE - Delete a leave by date
 export async function DELETE(request: NextRequest) {
@@ -22,10 +22,9 @@ export async function DELETE(request: NextRequest) {
 
     const collection = await getAttendanceCollection();
 
-    // Parse the date and create start/end of day for comparison
+    // Parse the date and create start/end of day for comparison using UTC
     const [year, month, day] = dateParam.split("-").map(Number);
-    const startOfDay = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
-    const endOfDay = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+    const { start: startOfDay, end: endOfDay } = getUTCDayRange(year, month - 1, day);
 
     // Find the record
     const existingRecord = await collection.findOne({
@@ -80,10 +79,9 @@ export async function PUT(request: NextRequest) {
 
     const collection = await getAttendanceCollection();
 
-    // Parse the original date
+    // Parse the original date using UTC
     const [origYear, origMonth, origDay] = originalDate.split("-").map(Number);
-    const origStartOfDay = new Date(Date.UTC(origYear, origMonth - 1, origDay, 0, 0, 0, 0));
-    const origEndOfDay = new Date(Date.UTC(origYear, origMonth - 1, origDay, 23, 59, 59, 999));
+    const { start: origStartOfDay, end: origEndOfDay } = getUTCDayRange(origYear, origMonth - 1, origDay);
 
     // Find the original record
     const existingRecord = await collection.findOne({
@@ -113,12 +111,11 @@ export async function PUT(request: NextRequest) {
     const leaveTypeLabel = leaveTypeLabels[leaveType] || "Leave";
     const noteText = notes ? `${leaveTypeLabel} - ${notes}` : leaveTypeLabel;
 
-    // Parse the new date if provided
-    let updateDate = origStartOfDay;
+    // Use UTC noon for the date - default to original date normalized to noon
+    let updateDate = createUTCNoonDate(origYear, origMonth - 1, origDay);
     if (newDate && newDate !== originalDate) {
       const [newYear, newMonth, newDay] = newDate.split("-").map(Number);
-      const newStartOfDay = new Date(Date.UTC(newYear, newMonth - 1, newDay, 0, 0, 0, 0));
-      const newEndOfDay = new Date(Date.UTC(newYear, newMonth - 1, newDay, 23, 59, 59, 999));
+      const { start: newStartOfDay, end: newEndOfDay } = getUTCDayRange(newYear, newMonth - 1, newDay);
 
       // Check for conflicts on the new date
       const conflictRecord = await collection.findOne({
@@ -136,7 +133,8 @@ export async function PUT(request: NextRequest) {
         );
       }
 
-      updateDate = newStartOfDay;
+      // Store at UTC noon for consistency
+      updateDate = createUTCNoonDate(newYear, newMonth - 1, newDay);
     }
 
     // Update the record
