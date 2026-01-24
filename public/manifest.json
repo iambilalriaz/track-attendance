@@ -1,6 +1,6 @@
 {
   "name": "Track Attendance",
-  "short_name": "Attendance",
+  "short_name": "Track Attendance",
   "description": "Secure attendance tracking application",
   "start_url": "/dashboard",
   "display": "standalone",
