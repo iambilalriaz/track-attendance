@@ -273,34 +273,36 @@ export default function AdminWorkReportPage() {
             <>
               {/* User Info Card */}
               <div className="rounded-2xl bg-white/60 dark:bg-zinc-800/60 backdrop-blur-md border border-zinc-200/50 dark:border-zinc-700/50 p-6 shadow-lg mb-6">
-                <div className="flex items-center gap-4">
-                  {data.user.image ? (
-                    <Image
-                      src={data.user.image}
-                      alt={data.user.name || data.user.email}
-                      width={56}
-                      height={56}
-                      className="rounded-full"
-                    />
-                  ) : (
-                    <div className="w-14 h-14 rounded-full bg-zinc-200 dark:bg-zinc-600 flex items-center justify-center">
-                      <span className="text-lg font-medium text-zinc-600 dark:text-zinc-300">
-                        {(data.user.name || data.user.email).charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex-1">
-                    <h2 className="text-xl font-bold text-zinc-900 dark:text-white">
-                      {data.user.name || data.user.email}
-                      {data.user.isAdmin && (
-                        <span className="ml-2 px-2 py-0.5 text-xs font-medium rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
-                          Admin
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    {data.user.image ? (
+                      <Image
+                        src={data.user.image}
+                        alt={data.user.name || data.user.email}
+                        width={56}
+                        height={56}
+                        className="rounded-full shrink-0"
+                      />
+                    ) : (
+                      <div className="w-14 h-14 rounded-full bg-zinc-200 dark:bg-zinc-600 flex items-center justify-center shrink-0">
+                        <span className="text-lg font-medium text-zinc-600 dark:text-zinc-300">
+                          {(data.user.name || data.user.email).charAt(0).toUpperCase()}
                         </span>
-                      )}
-                    </h2>
-                    <p className="text-zinc-500 dark:text-zinc-400">{data.user.email}</p>
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-xl font-bold text-zinc-900 dark:text-white flex flex-wrap items-center gap-2">
+                        <span className="truncate">{data.user.name || data.user.email}</span>
+                        {data.user.isAdmin && (
+                          <span className="px-2 py-0.5 text-xs font-medium rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 shrink-0">
+                            Admin
+                          </span>
+                        )}
+                      </h2>
+                      <p className="text-zinc-500 dark:text-zinc-400 truncate">{data.user.email}</p>
+                    </div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-left sm:text-right shrink-0">
                     <p className="text-lg font-semibold text-zinc-900 dark:text-white">
                       {data.month.name} {data.month.year}
                     </p>
@@ -367,13 +369,13 @@ export default function AdminWorkReportPage() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
-                        <th className="text-left px-6 py-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                        <th className="text-left px-3 sm:px-6 py-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
                           Date
                         </th>
-                        <th className="text-left px-6 py-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                        <th className="text-left px-3 sm:px-6 py-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
                           Day
                         </th>
-                        <th className="text-left px-6 py-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                        <th className="text-left px-3 sm:px-6 py-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
                           Status
                         </th>
                       </tr>
@@ -388,13 +390,13 @@ export default function AdminWorkReportPage() {
                               index % 2 === 0 ? "bg-white/50 dark:bg-zinc-800/20" : ""
                             }`}
                           >
-                            <td className="px-6 py-3 text-sm font-medium text-zinc-900 dark:text-white">
+                            <td className="px-3 sm:px-6 py-3 text-sm font-medium text-zinc-900 dark:text-white whitespace-nowrap">
                               {record.date}
                             </td>
-                            <td className="px-6 py-3 text-sm text-zinc-600 dark:text-zinc-400">
+                            <td className="px-3 sm:px-6 py-3 text-sm text-zinc-600 dark:text-zinc-400">
                               {record.dayOfWeek}
                             </td>
-                            <td className="px-6 py-3">
+                            <td className="px-3 sm:px-6 py-3">
                               <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${config.bg} ${config.color}`}>
                                 {config.label}
                               </span>
