@@ -79,8 +79,7 @@ export async function GET() {
       total: users.length,
       present: userStatuses.filter((u) => u.status === "present").length,
       wfh: userStatuses.filter((u) => u.status === "wfh").length,
-      leave: userStatuses.filter((u) => u.status === "leave").length,
-      halfDay: userStatuses.filter((u) => u.status === "half-day").length,
+      leave: userStatuses.filter((u) => u.status === "leave" || u.status === "absent" || u.status === "planned-leave" || u.status === "unplanned-leave" || u.status === "parental-leave").length,
       notMarked: userStatuses.filter((u) => !u.status).length,
     };
 

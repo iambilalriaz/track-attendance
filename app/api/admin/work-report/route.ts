@@ -102,8 +102,7 @@ export async function GET(request: NextRequest) {
     const summary = {
       present: dailyRecords.filter((r) => r.status === "present").length,
       wfh: dailyRecords.filter((r) => r.status === "wfh").length,
-      leave: dailyRecords.filter((r) => r.status === "leave" || r.status === "absent").length,
-      halfDay: dailyRecords.filter((r) => r.status === "half-day").length,
+      leave: dailyRecords.filter((r) => r.status === "leave" || r.status === "absent" || r.status === "planned-leave" || r.status === "unplanned-leave" || r.status === "parental-leave").length,
       total: dailyRecords.length,
     };
 

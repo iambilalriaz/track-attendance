@@ -39,7 +39,6 @@ interface WorkReportData {
     present: number;
     wfh: number;
     leave: number;
-    halfDay: number;
     total: number;
   };
   records: DailyRecord[];
@@ -172,12 +171,18 @@ export default function AdminWorkReportPage() {
     wfh: { label: "WFH", color: "text-blue-700 dark:text-blue-300", bg: "bg-blue-100 dark:bg-blue-900/30" },
     leave: { label: "Leave", color: "text-amber-700 dark:text-amber-300", bg: "bg-amber-100 dark:bg-amber-900/30" },
     absent: { label: "Leave", color: "text-amber-700 dark:text-amber-300", bg: "bg-amber-100 dark:bg-amber-900/30" },
-    "half-day": { label: "Half Day", color: "text-purple-700 dark:text-purple-300", bg: "bg-purple-100 dark:bg-purple-900/30" },
+    "planned-leave": { label: "Planned Leave", color: "text-amber-700 dark:text-amber-300", bg: "bg-amber-100 dark:bg-amber-900/30" },
+    "unplanned-leave": { label: "Unplanned Leave", color: "text-amber-700 dark:text-amber-300", bg: "bg-amber-100 dark:bg-amber-900/30" },
+    "parental-leave": { label: "Parental Leave", color: "text-purple-700 dark:text-purple-300", bg: "bg-purple-100 dark:bg-purple-900/30" },
   };
 
   const filteredRecords = data?.records.filter((r) => {
     if (statusFilter === "all") return true;
-    if (statusFilter === "leave") return r.status === "leave" || r.status === "absent";
+    if (statusFilter === "leave") {
+      return r.status === "leave" || r.status === "absent" ||
+             r.status === "planned-leave" || r.status === "unplanned-leave" ||
+             r.status === "parental-leave";
+    }
     return r.status === statusFilter;
   }) || [];
 
@@ -307,7 +312,7 @@ export default function AdminWorkReportPage() {
               </div>
 
               {/* Summary Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+              <div className="grid grid-cols-3 gap-4 mb-6">
                 <button
                   onClick={() => setStatusFilter(statusFilter === "present" ? "all" : "present")}
                   className={`p-4 rounded-xl text-center transition-all ${
@@ -340,17 +345,6 @@ export default function AdminWorkReportPage() {
                     {data.summary.leave}
                   </p>
                   <p className="text-xs text-amber-600 dark:text-amber-400">Leave Days</p>
-                </button>
-                <button
-                  onClick={() => setStatusFilter(statusFilter === "half-day" ? "all" : "half-day")}
-                  className={`p-4 rounded-xl text-center transition-all ${
-                    statusFilter === "half-day" ? "ring-2 ring-purple-600" : ""
-                  } bg-purple-100 dark:bg-purple-900/30`}
-                >
-                  <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">
-                    {data.summary.halfDay}
-                  </p>
-                  <p className="text-xs text-purple-600 dark:text-purple-400">Half Days</p>
                 </button>
               </div>
 

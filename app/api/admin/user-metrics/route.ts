@@ -88,8 +88,6 @@ export async function GET(request: NextRequest) {
       present: 0,
       wfh: 0,
       leave: 0,
-      halfDay: 0,
-      absent: 0,
     };
 
     // Monthly breakdown
@@ -99,7 +97,6 @@ export async function GET(request: NextRequest) {
       present: number;
       wfh: number;
       leave: number;
-      halfDay: number;
     }> = [];
 
     const monthNames = [
@@ -118,8 +115,7 @@ export async function GET(request: NextRequest) {
         name: monthNames[m],
         present: monthRecords.filter((r) => r.status === "present").length,
         wfh: monthRecords.filter((r) => r.status === "wfh").length,
-        leave: monthRecords.filter((r) => r.status === "leave" || r.status === "absent").length,
-        halfDay: monthRecords.filter((r) => r.status === "half-day").length,
+        leave: monthRecords.filter((r) => r.status === "leave" || r.status === "absent" || r.status === "planned-leave" || r.status === "unplanned-leave" || r.status === "parental-leave").length,
       };
 
       monthlyBreakdown.push(monthStats);
@@ -127,11 +123,13 @@ export async function GET(request: NextRequest) {
       yearlyStats.present += monthStats.present;
       yearlyStats.wfh += monthStats.wfh;
       yearlyStats.leave += monthStats.leave;
-      yearlyStats.halfDay += monthStats.halfDay;
     }
 
     // Calculate leave breakdown by type
-    const leaveRecords = records.filter((r) => r.status === "absent" || r.status === "leave");
+    const leaveRecords = records.filter((r) =>
+      r.status === "absent" || r.status === "leave" ||
+      r.status === "planned-leave" || r.status === "unplanned-leave" || r.status === "parental-leave"
+    );
     const leaveBreakdown = {
       planned: leaveRecords.filter((r) => r.notes?.includes("Planned Leave") && !r.notes?.includes("Unpaid Leave")).length,
       unplanned: leaveRecords.filter((r) => r.notes?.includes("Unplanned Leave") && !r.notes?.includes("Unpaid Leave")).length,

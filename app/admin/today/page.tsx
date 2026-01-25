@@ -27,7 +27,6 @@ interface TodayData {
     present: number;
     wfh: number;
     leave: number;
-    halfDay: number;
     notMarked: number;
   };
   users: UserStatus[];
@@ -108,12 +107,20 @@ export default function AdminTodayPage() {
     present: { label: "Office", color: "text-emerald-700 dark:text-emerald-300", bg: "bg-emerald-100 dark:bg-emerald-900/30" },
     wfh: { label: "WFH", color: "text-blue-700 dark:text-blue-300", bg: "bg-blue-100 dark:bg-blue-900/30" },
     leave: { label: "Leave", color: "text-amber-700 dark:text-amber-300", bg: "bg-amber-100 dark:bg-amber-900/30" },
-    "half-day": { label: "Half Day", color: "text-purple-700 dark:text-purple-300", bg: "bg-purple-100 dark:bg-purple-900/30" },
+    absent: { label: "Leave", color: "text-amber-700 dark:text-amber-300", bg: "bg-amber-100 dark:bg-amber-900/30" },
+    "planned-leave": { label: "Planned Leave", color: "text-amber-700 dark:text-amber-300", bg: "bg-amber-100 dark:bg-amber-900/30" },
+    "unplanned-leave": { label: "Unplanned Leave", color: "text-amber-700 dark:text-amber-300", bg: "bg-amber-100 dark:bg-amber-900/30" },
+    "parental-leave": { label: "Parental Leave", color: "text-purple-700 dark:text-purple-300", bg: "bg-purple-100 dark:bg-purple-900/30" },
   };
 
   const filteredUsers = data?.users.filter((user) => {
     if (filter === "all") return true;
     if (filter === "not-marked") return !user.status;
+    if (filter === "leave") {
+      return user.status === "leave" || user.status === "absent" ||
+             user.status === "planned-leave" || user.status === "unplanned-leave" ||
+             user.status === "parental-leave";
+    }
     return user.status === filter;
   }) || [];
 
@@ -164,7 +171,7 @@ export default function AdminTodayPage() {
             <>
               {/* Summary Cards */}
               {data && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
                   <button
                     onClick={() => setFilter("all")}
                     className={`p-4 rounded-xl text-center transition-all ${
@@ -216,19 +223,6 @@ export default function AdminTodayPage() {
                       {data.summary.leave}
                     </p>
                     <p className="text-xs text-amber-600 dark:text-amber-400">Leave</p>
-                  </button>
-                  <button
-                    onClick={() => setFilter("half-day")}
-                    className={`p-4 rounded-xl text-center transition-all ${
-                      filter === "half-day"
-                        ? "ring-2 ring-purple-600 dark:ring-purple-400"
-                        : ""
-                    } bg-purple-100 dark:bg-purple-900/30`}
-                  >
-                    <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">
-                      {data.summary.halfDay}
-                    </p>
-                    <p className="text-xs text-purple-600 dark:text-purple-400">Half Day</p>
                   </button>
                   <button
                     onClick={() => setFilter("not-marked")}

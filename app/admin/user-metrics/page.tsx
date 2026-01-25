@@ -27,7 +27,6 @@ interface UserMetricsData {
     present: number;
     wfh: number;
     leave: number;
-    halfDay: number;
   };
   monthlyBreakdown: Array<{
     month: number;
@@ -35,7 +34,6 @@ interface UserMetricsData {
     present: number;
     wfh: number;
     leave: number;
-    halfDay: number;
   }>;
   leaveBreakdown: {
     planned: number;
@@ -162,7 +160,9 @@ export default function AdminUserMetricsPage() {
     wfh: { label: "WFH", color: "text-blue-700 dark:text-blue-300" },
     leave: { label: "Leave", color: "text-amber-700 dark:text-amber-300" },
     absent: { label: "Leave", color: "text-amber-700 dark:text-amber-300" },
-    "half-day": { label: "Half Day", color: "text-purple-700 dark:text-purple-300" },
+    "planned-leave": { label: "Planned Leave", color: "text-amber-700 dark:text-amber-300" },
+    "unplanned-leave": { label: "Unplanned Leave", color: "text-amber-700 dark:text-amber-300" },
+    "parental-leave": { label: "Parental Leave", color: "text-purple-700 dark:text-purple-300" },
   };
 
   return (
@@ -252,7 +252,7 @@ export default function AdminUserMetricsPage() {
               </div>
 
               {/* Yearly Stats */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+              <div className="grid grid-cols-3 gap-4 mb-6">
                 <div className="p-4 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 text-center">
                   <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
                     {metrics.yearlyStats.present}
@@ -270,12 +270,6 @@ export default function AdminUserMetricsPage() {
                     {metrics.yearlyStats.leave}
                   </p>
                   <p className="text-xs text-amber-600 dark:text-amber-400">Leave Days</p>
-                </div>
-                <div className="p-4 rounded-xl bg-purple-100 dark:bg-purple-900/30 text-center">
-                  <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">
-                    {metrics.yearlyStats.halfDay}
-                  </p>
-                  <p className="text-xs text-purple-600 dark:text-purple-400">Half Days</p>
                 </div>
               </div>
 
@@ -375,7 +369,6 @@ export default function AdminUserMetricsPage() {
                         <th className="text-center px-3 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-300">Office</th>
                         <th className="text-center px-3 py-2 text-sm font-medium text-blue-700 dark:text-blue-300">WFH</th>
                         <th className="text-center px-3 py-2 text-sm font-medium text-amber-700 dark:text-amber-300">Leave</th>
-                        <th className="text-center px-3 py-2 text-sm font-medium text-purple-700 dark:text-purple-300">Half Day</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -385,7 +378,6 @@ export default function AdminUserMetricsPage() {
                           <td className="text-center px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300">{month.present}</td>
                           <td className="text-center px-3 py-2 text-sm text-blue-700 dark:text-blue-300">{month.wfh}</td>
                           <td className="text-center px-3 py-2 text-sm text-amber-700 dark:text-amber-300">{month.leave}</td>
-                          <td className="text-center px-3 py-2 text-sm text-purple-700 dark:text-purple-300">{month.halfDay}</td>
                         </tr>
                       ))}
                     </tbody>
